@@ -1,8 +1,8 @@
 import hre from "hardhat";
-import { parseUnits, PublicClient, WalletClient, Account, Chain, Transport, Hex, GetContractReturnType, createWalletClient, http } from "viem";
+import { parseUnits, PublicClient, WalletClient, Account, Chain, Transport, Hex, createWalletClient, http, formatUnits } from "viem";
 import { privateKeyToAccount } from 'viem/accounts';
 import { flare } from 'viem/chains'; // Import flare chain definition
-import carbonOffsetArtifact from "../artifacts/contracts/CarbonOffsetFlare.sol/CarbonOffset.json"; // Import ABI directly
+import minimalBridgeArtifact from "../artifacts/contracts/MinimalFlareUSDTBridge.sol/MinimalFlareUSDTBridge.json"; // Import ABI for the new contract
 
 // Minimal ERC20 ABI for transfer and balanceOf
 const erc20Abi = [
@@ -32,7 +32,7 @@ async function main() {
     let walletClient: WalletClient<Transport, Chain, Account>;
     let deployerAccount: Account;
     const publicClient: PublicClient<Transport, Chain> = await hre.viem.getPublicClient();
-    let transportUrl: string; // Explicitly type transportUrl as string
+    let transportUrl: string;
 
     if (networkName === "hardhat" || networkName === "localhost") {
         const [localDeployerWalletClient] = await hre.viem.getWalletClients();
@@ -44,117 +44,130 @@ async function main() {
         if (networkConfig && 'url' in networkConfig && typeof networkConfig.url === 'string') {
             transportUrl = networkConfig.url;
         } else {
-            transportUrl = flare.rpcUrls.default.http[0]; // Default to flare's public RPC
+            transportUrl = flare.rpcUrls.default.http[0];
         }
         walletClient = createWalletClient({
             account: deployerAccount,
-            chain: flare, // Assuming flare network, adjust if networkName implies other viem chains
+            chain: flare,
             transport: http(transportUrl)
         });
     } else {
         throw new Error("PRIVATE_KEY not found in .env file for live network deployment or local setup issue.");
     }
-    
-    console.log("Deploying contracts with the account:", deployerAccount.address);
+
+    console.log("Deploying with account:", deployerAccount.address);
     const balance = await publicClient.getBalance({ address: deployerAccount.address });
-    console.log("Account FLR balance:", balance.toString());
+    console.log("Account FLR balance:", formatUnits(balance, 18));
 
+    // --- CONFIGURATION START ---
+    // Flare ERC20 USDT Token address
     const flareUsdtAddress = "0x0B38e83B86d491735fEaa0a791F65c2B99535396" as Hex;
-    const stargateRouterFlare = "0x45d417612e177672958dC0537C45a8f8d754Ac2E" as Hex;
-    const amountUSDTToBridge = parseUnits("0.001", 6);
-    console.log("Attempting to bridge THIS AMOUNT (raw units):", amountUSDTToBridge.toString());
-    const polygonRecipientAddress: Hex = deployerAccount.address;
-    const minCharOutputOnPolygon = BigInt(1);
+    // CORRECT Flare USDT OFT Contract Address (from your successful transaction)
+    const flareUsdtOFTAddress = "0x1C10CC06DC6D35970d1D53B2A23c76ef370d4135" as Hex;
+    // Amount of USDT to bridge (in its native 6 decimals)
+    const amountUSDTToBridge = parseUnits("0.001", 6); // e.g., 0.001 USDT = 1000 raw units
+    // Recipient address on Polygon
+    const polygonRecipientAddress: Hex = deployerAccount.address; 
+    // --- CONFIGURATION END ---
 
-    console.log("\nDeploying CarbonOffset contract...");
+    console.log(`Attempting to bridge ${formatUnits(amountUSDTToBridge, 6)} USDT (${amountUSDTToBridge.toString()} raw units)`);
+    console.log(`   From Flare (Account: ${deployerAccount.address})`);
+    console.log(`   To Polygon (Recipient: ${polygonRecipientAddress})`);
+    console.log(`   Using USDT OFT Contract on Flare: ${flareUsdtOFTAddress}`);
+
+    console.log("\nDeploying MinimalFlareUSDTBridge contract...");
     const deployHash = await walletClient.deployContract({
-        abi: carbonOffsetArtifact.abi,
-        bytecode: carbonOffsetArtifact.bytecode as Hex,
+        abi: minimalBridgeArtifact.abi,
+        bytecode: minimalBridgeArtifact.bytecode as Hex,
         account: deployerAccount,
-        args: [stargateRouterFlare, flareUsdtAddress],
+        args: [flareUsdtOFTAddress, flareUsdtAddress], // Constructor args: (_stargateUsdtOFTAddress, _erc20UsdtTokenAddress)
     });
     console.log("Deployment transaction sent, hash:", deployHash);
     const deployReceipt = await publicClient.waitForTransactionReceipt({ hash: deployHash });
-    const carbonOffsetContractAddress = deployReceipt.contractAddress;
-    if (!carbonOffsetContractAddress) {
-        throw new Error("Contract address not found after deployment.");
+    const minimalBridgeContractAddress = deployReceipt.contractAddress;
+    if (!minimalBridgeContractAddress) {
+        throw new Error("MinimalFlareUSDTBridge contract address not found after deployment.");
     }
-    console.log("CarbonOffset contract deployed to:", carbonOffsetContractAddress);
+    console.log("MinimalFlareUSDTBridge contract deployed to:", minimalBridgeContractAddress);
 
-    console.log(`\nTransferring ${amountUSDTToBridge.toString()} raw units of USDT from deployer to CarbonOffset contract (${carbonOffsetContractAddress})...`);
+    console.log(`\nTransferring ${formatUnits(amountUSDTToBridge, 6)} USDT to MinimalFlareUSDTBridge contract...`);
     const deployerUsdtBalanceBefore = await publicClient.readContract({
         address: flareUsdtAddress,
         abi: erc20Abi,
         functionName: 'balanceOf',
         args: [deployerAccount.address]
     }) as bigint;
-    console.log(`Deployer USDT balance before transfer: ${deployerUsdtBalanceBefore.toString()}`);
+    console.log(`   Deployer USDT balance before: ${formatUnits(deployerUsdtBalanceBefore, 6)} USDT`);
 
     if (deployerUsdtBalanceBefore < amountUSDTToBridge) {
-        throw new Error(`Deployer has insufficient USDT. Needs ${amountUSDTToBridge}, has ${deployerUsdtBalanceBefore.toString()}`);
+        throw new Error(`Deployer has insufficient USDT. Needs ${formatUnits(amountUSDTToBridge, 6)}, has ${formatUnits(deployerUsdtBalanceBefore, 6)}`);
     }
 
     const { request: transferRequest } = await publicClient.simulateContract({
         address: flareUsdtAddress,
         abi: erc20Abi,
         functionName: "transfer",
-        args: [carbonOffsetContractAddress, amountUSDTToBridge],
+        args: [minimalBridgeContractAddress, amountUSDTToBridge],
         account: deployerAccount,
     });
     const transferTxHash = await walletClient.writeContract(transferRequest);
-    console.log("USDT transfer transaction sent! Hash:", transferTxHash);
+    console.log("   USDT transfer transaction sent! Hash:", transferTxHash);
     await publicClient.waitForTransactionReceipt({ hash: transferTxHash });
-    console.log("USDT transfer confirmed!");
+    console.log("   USDT transfer confirmed!");
 
     const contractUsdtBalance = await publicClient.readContract({
         address: flareUsdtAddress,
         abi: erc20Abi,
         functionName: 'balanceOf',
-        args: [carbonOffsetContractAddress]
+        args: [minimalBridgeContractAddress]
     }) as bigint;
-    console.log(`CarbonOffset contract USDT balance: ${contractUsdtBalance.toString()}`);
+    console.log(`   MinimalFlareUSDTBridge contract USDT balance: ${formatUnits(contractUsdtBalance, 6)} USDT`);
     if (contractUsdtBalance < amountUSDTToBridge) {
-        console.warn("CarbonOffset contract might not have enough USDT after transfer, check amounts!");
+        console.warn("   WARNING: Contract might not have enough USDT after transfer, check amounts!");
     }
 
-    const carbonOffsetContract = await hre.viem.getContractAt(
-        "CarbonOffset",
-        carbonOffsetContractAddress,
+    const minimalBridgeContract = await hre.viem.getContractAt(
+        "MinimalFlareUSDTBridge",
+        minimalBridgeContractAddress,
         { client: { wallet: walletClient, public: publicClient } }
     );
 
-    console.log("\nCalling bridgeAndSwapOnPolygon...");
-    console.log(`   Amount to bridge: ${amountUSDTToBridge.toString()} (raw units, 6 decimals) USDT`);
-    console.log(`   Recipient on Polygon: ${polygonRecipientAddress}`);
-    console.log(`   Min output on Polygon (mocked): ${minCharOutputOnPolygon.toString()}`);
+    console.log("\nEstimating LayerZero fee for bridging...");
+    const [nativeFee, lzTokenFee] = await minimalBridgeContract.read.getFeeEstimate([
+        amountUSDTToBridge,
+        polygonRecipientAddress
+    ]);
+    console.log(`   Estimated LZ Native Fee: ${formatUnits(nativeFee, 18)} FLR`);
+    console.log(`   Estimated LZ Token Fee (ZRO): ${lzTokenFee.toString()}`);
 
-    const { request } = await publicClient.simulateContract({
-        address: carbonOffsetContract.address, // Use contract instance address
-        abi: carbonOffsetArtifact.abi, 
-        functionName: "bridgeAndSwapOnPolygon",
-        args: [amountUSDTToBridge, polygonRecipientAddress, minCharOutputOnPolygon],
+    if (balance < nativeFee) {
+        throw new Error(`Deployer has insufficient FLR for LZ fee. Needs ${formatUnits(nativeFee, 18)}, has ${formatUnits(balance, 18)} FLR`);
+    }
+
+    console.log("\nCalling bridgeUSDTToPolygon...");
+    const { request: bridgeRequest } = await publicClient.simulateContract({
+        address: minimalBridgeContract.address,
+        abi: minimalBridgeArtifact.abi,
+        functionName: "bridgeUSDTToPolygon",
+        args: [amountUSDTToBridge, polygonRecipientAddress],
         account: deployerAccount,
+        value: nativeFee, // Pass the estimated native fee as msg.value
     });
-    const txHash = await walletClient.writeContract(request);
-    
-    console.log("Transaction sent! Hash:", txHash);
-    await publicClient.waitForTransactionReceipt({ hash: txHash });
-    console.log("Transaction confirmed!");
+    const bridgeTxHash = await walletClient.writeContract(bridgeRequest);
 
-    console.log("\n--- Next Steps ---");
-    console.log("1. Check your transaction on the Flare Explorer (e.g., FlareScan).");
-    console.log("2. Monitor the LayerZero message on LayerZeroScan: https://layerzeroscan.com/");
-    console.log("   Look for a message originating from Flare (Source EID 30295) to Polygon (Dest EID 30111).");
-    console.log("3. If the message is delivered successfully, check the polygonRecipientAddress on Polygon for the swapped tokens (or USDT if swap failed).");
-    console.log("   The TokenSwapComposer contract on Polygon is:", "0xCECA34B92DbBAf1715De564172c61A4782248CCD");
-    console.log("\nIMPORTANT: The current contract has a modified bridgeAndSwapOnPolygon for debugging quoteOFT.");
-    console.log("Revert CarbonOffsetFlare.sol to its previous state (with fee handling and require checks) for a full end-to-end test once quoteOFT behavior is understood.");
+    console.log("   Bridge transaction sent! Hash:", bridgeTxHash);
+    await publicClient.waitForTransactionReceipt({ hash: bridgeTxHash });
+    console.log("   Bridge transaction confirmed! Visit LayerZeroScan to track message delivery.");
 
+    console.log("\n--- Bridge Initiated --- ");
+    console.log(`   LZ Scan: https://layerzeroscan.com/tx/${bridgeTxHash} (Might take a moment to appear)`);
+    console.log("   Monitor the LayerZero message from Flare (EID 30295) to Polygon (EID 30111).");
+    console.log(`   Recipient ${polygonRecipientAddress} on Polygon should receive USDT.`);
 }
 
 main()
     .then(() => process.exit(0))
     .catch((error) => {
-        console.error(error);
+        console.error("Script failed:", error);
         process.exit(1);
     }); 
