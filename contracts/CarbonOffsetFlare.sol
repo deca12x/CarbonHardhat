@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@stargatefinance/stg-evm-v2/src/interfaces/IStargate.sol";
 import "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/libs/OptionsBuilder.sol";
 // Import SendParam, MessagingFee, and OFTReceipt directly from IOFT.sol
-import { IOFT, SendParam, MessagingFee, OFTReceipt } from "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/interfaces/IOFT.sol";
+import {IOFT, SendParam, MessagingFee, OFTReceipt} from "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/interfaces/IOFT.sol";
 
 // Link OptionsBuilder to the bytes type
 using OptionsBuilder for bytes;
@@ -20,7 +20,7 @@ uint32 constant POLYGON_EID = 30111;
 
 contract CarbonOffset {
     address public stargateBridge;
-    address public usdcToken;
+    address public usdtToken;
 
     struct CarbonOffsetData {
         address recipientAddress;
@@ -28,9 +28,9 @@ contract CarbonOffset {
         uint256 rate;
     }
 
-    constructor(address _stargateBridge, address _usdcToken) {
+    constructor(address _stargateBridge, address _usdtToken) {
         stargateBridge = _stargateBridge;
-        usdcToken = _usdcToken;
+        usdtToken = _usdtToken;
     }
 
     function carbonOffset(
@@ -39,29 +39,18 @@ contract CarbonOffset {
         address recipientAddress,
         uint256 maxAmountReceived
     ) public {
-        // Calculate the amount of USDC needed
-        uint256 amountUSDCneeded = calculateUSDCNeeded(proof, rate);
+        uint256 amountUSDTneeded = calculateUSDTNeeded();
 
-        // Ensure the amount is within the max allowed
         require(
-            amountUSDCneeded <= maxAmountReceived,
+            amountUSDTneeded <= maxAmountReceived,
             "Amount exceeds max allowed"
         );
 
-        // Interact with the Stargate bridge to send USDC
-        bridgeUSDC(amountUSDCneeded, recipientAddress);
+        bridgeAndSwapOnPolygon(amountUSDTneeded, recipientAddress, 1);
     }
 
-    function calculateUSDCNeeded(
-        bytes memory proof,
-        uint256 rate
-    ) internal pure returns (uint256) {
-        // Implement your logic to calculate the USDC needed
+    function calculateUSDTNeeded() internal pure returns (uint256) {
         return 0.01 * 10 ** 6;
-    }
-
-    function bridgeUSDC(uint256 amount, address recipient) internal {
-        // Implement the logic to interact with the Stargate bridge
     }
 
     event DebugQuoteOFT(uint256 amountReceivedLD);
@@ -80,43 +69,51 @@ contract CarbonOffset {
         uint256 amountUSDT,
         address finalRecipientOnPolygon,
         uint256 minCharOutputOnPolygon
-    ) public payable { 
-        IERC20(usdcToken).approve(STARGATE_ROUTER_FLARE, amountUSDT);
+    ) public payable {
+        IERC20(usdtToken).approve(STARGATE_ROUTER_FLARE, amountUSDT);
 
-        bytes memory actualComposeMsg = abi.encode(msg.sender, finalRecipientOnPolygon, minCharOutputOnPolygon);
-        bytes memory actualExtraOptions = OptionsBuilder.newOptions().addExecutorLzComposeOption(0, 200000, 0);
+        bytes memory actualComposeMsg = abi.encode(
+            msg.sender,
+            finalRecipientOnPolygon,
+            minCharOutputOnPolygon
+        );
+        bytes memory actualExtraOptions = OptionsBuilder
+            .newOptions()
+            .addExecutorLzComposeOption(0, 200000, 0);
 
         SendParam memory debugSendParam = SendParam({
             dstEid: POLYGON_EID,
             to: addressToBytes32(POLYGON_COMPOSER),
             amountLD: amountUSDT,
-            minAmountLD: amountUSDT, 
-            extraOptions: bytes(""), 
-            composeMsg: bytes(""),   
-            oftCmd: "" 
+            minAmountLD: amountUSDT,
+            extraOptions: bytes(""),
+            composeMsg: bytes(""),
+            oftCmd: ""
         });
         emit DebugSendParam(debugSendParam);
 
         IStargate stargateRouter = IStargate(STARGATE_ROUTER_FLARE);
-        
+
         // Attempt to call quoteOFT and catch any revert
         try stargateRouter.quoteOFT(debugSendParam) {
             // If this point is reached, quoteOFT did NOT revert with debugSendParam
             // We can't easily get the return values here without potential linter issues again,
             // but knowing it didn't revert is the primary goal of this specific test.
-            emit DebugQuoteOFTAttemptSucceeded(); 
+            emit DebugQuoteOFTAttemptSucceeded();
         } catch Error(string memory reason) {
             emit QuoteOFTFailed(reason);
             revert(reason);
         } catch {
             emit QuoteOFTFailedGeneric();
-            revert("quoteOFT(debugSendParam) reverted without reason (generic catch)");
+            revert(
+                "quoteOFT(debugSendParam) reverted without reason (generic catch)"
+            );
         }
 
         // The rest of the function remains commented out for this specific debug step.
         // If DebugQuoteOFTAttemptSucceeded is emitted, the next step would be to try quoteOFT
         // with the *actual* composeMsg and extraOptions, or to try and get its return values more carefully.
-        /* 
+        /*
         // ... (original logic with actualSendParam, quoteSend, sendToken) ...
         */
     }
