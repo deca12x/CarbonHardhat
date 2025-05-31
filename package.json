@@ -4,12 +4,13 @@
     "editGist": "ts-node scripts/editGist.ts"
   },
   "devDependencies": {
+    "@flarenetwork/flare-periphery-contracts": "^0.1.26",
     "@nomicfoundation/hardhat-toolbox-viem": "^3.0.0",
     "dotenv": "^16.5.0",
-    "hardhat": "^2.24.1",
-    "@flarenetwork/flare-periphery-contracts": "^0.1.26"
+    "hardhat": "^2.24.1"
   },
   "dependencies": {
-
+    "@layerzerolabs/lz-evm-oapp-v2": "^3.0.99",
+    "@stargatefinance/stg-evm-v2": "^2.0.4"
   }
 }

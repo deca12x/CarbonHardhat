@@ -20,7 +20,7 @@ uint32 constant POLYGON_EID = 30111;
 
 contract CarbonOffset {
     address public stargateBridge;
-    address public usdcToken;
+    address public usdtToken;
 
     struct CarbonOffsetData {
         address recipientAddress;
@@ -28,9 +28,9 @@ contract CarbonOffset {
         uint256 rate;
     }
 
-    constructor(address _stargateBridge, address _usdcToken) {
+    constructor(address _stargateBridge, address _usdtToken) {
         stargateBridge = _stargateBridge;
-        usdcToken = _usdcToken;
+        usdtToken = _usdtToken;
     }
 
     function carbonOffset(
@@ -39,25 +39,18 @@ contract CarbonOffset {
         address recipientAddress,
         uint256 maxAmountReceived
     ) public {
-        uint256 amountUSDCneeded = calculateUSDCNeeded(proof, rate);
+        uint256 amountUSDTneeded = calculateUSDTNeeded();
 
         require(
-            amountUSDCneeded <= maxAmountReceived,
+            amountUSDTneeded <= maxAmountReceived,
             "Amount exceeds max allowed"
         );
 
-        bridgeUSDC(amountUSDCneeded, recipientAddress);
+        bridgeAndSwapOnPolygon(amountUSDTneeded, recipientAddress, 1);
     }
 
-    function calculateUSDCNeeded(
-        bytes memory proof,
-        uint256 rate
-    ) internal pure returns (uint256) {
+    function calculateUSDTNeeded() internal pure returns (uint256) {
         return 0.01 * 10 ** 6;
-    }
-
-    function bridgeUSDC(uint256 amount, address recipient) internal {
-        // Implement the logic to interact with the Stargate bridge
     }
 
     event DebugQuoteOFT(uint256 amountReceivedLD);
@@ -77,7 +70,7 @@ contract CarbonOffset {
         address finalRecipientOnPolygon,
         uint256 minCharOutputOnPolygon
     ) public payable {
-        IERC20(usdcToken).approve(STARGATE_ROUTER_FLARE, amountUSDT);
+        IERC20(usdtToken).approve(STARGATE_ROUTER_FLARE, amountUSDT);
 
         bytes memory actualComposeMsg = abi.encode(
             msg.sender,
