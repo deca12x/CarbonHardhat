@@ -20,7 +20,7 @@ The primary contract in this repository, `CarbonOffsetFlare.sol`, is designed to
 
 ### `CarbonOffsetFlare.sol`
 
-This contract represents the primary mechanism for cross-chain interactions. Future development may explore features like on-chain carbon calculation using FDC.
+This contract represents the primary mechanism for cross-chain interactions, set up for on-chain carbon calculation using FDC.
 
 ## Technical Details
 
