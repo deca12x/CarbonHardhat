@@ -1,125 +1,156 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
-import "@flarenetwork/flare-periphery-contracts/coston2/IWeb2Json.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@stargatefinance/stg-evm-v2/src/interfaces/IStargate.sol";
-import "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/libs/OptionsBuilder.sol";
-// Import SendParam, MessagingFee, and OFTReceipt directly from IOFT.sol
-import {IOFT, SendParam, MessagingFee, OFTReceipt} from "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/interfaces/IOFT.sol";
+import { IOFT, SendParam, MessagingFee, OFTReceipt, MessagingReceipt } from "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/interfaces/IOFT.sol";
+import { OptionsBuilder } from "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/libs/OptionsBuilder.sol";
 
-// Link OptionsBuilder to the bytes type
-using OptionsBuilder for bytes;
+contract CarbonOffsetFlare {
+    using OptionsBuilder for bytes;
 
-// Stargate Router on Flare
-address constant STARGATE_ROUTER_FLARE = 0x45d417612e177672958dC0537C45a8f8d754Ac2E;
-// Polygon Composer contract
-address constant POLYGON_COMPOSER = 0xCECA34B92DbBAf1715De564172c61A4782248CCD;
-// Polygon Endpoint ID
-uint32 constant POLYGON_EID = 30109;
+    IOFT public immutable stargateUsdtOFT;       // USDT OFT on Flare (0x1C1...)
+    IERC20 public immutable usdtTokenOnFlare;  // ERC20 USDT on Flare (0x0B3...)
+    address public immutable polygonComposerContract; // Your contract on Polygon (0xCEC...)
 
-contract CarbonOffset {
-    address public stargateBridge;
-    address public usdtToken;
+    // Stargate Polygon Endpoint ID
+    uint32 constant POLYGON_EID = 30109;
 
-    struct CarbonOffsetData {
-        address recipientAddress;
-        uint256 recipientGas;
-        uint256 rate;
+    event USDTBridgedAndComposed(
+        bytes32 indexed guid,
+        uint256 amountSentLD,
+        uint256 amountReceivedLD,
+        address indexed destinationContract,
+        bytes composeMsgSent,
+        uint256 lzNativeFee
+    );
+    event BridgeAndComposeFailed(string reason);
+    event QuotedOFTInfo(uint256 amountSentLD, uint256 amountReceivedLD);
+    event QuotedSendFee(uint256 nativeFee, uint256 lzTokenFee);
+
+    constructor(
+        address _stargateUsdtOFTAddress,    // e.g., 0x1C10CC06DC6D35970d1D53B2A23c76ef370d4135
+        address _erc20UsdtTokenAddress,   // e.g., 0x0B38e83B86d491735fEaa0a791F65c2B99535396
+        address _polygonComposerContractAddress // e.g., 0xCECA34B92DbBAf1715De564172c61A4782248CCD
+    ) {
+        stargateUsdtOFT = IOFT(_stargateUsdtOFTAddress);
+        usdtTokenOnFlare = IERC20(_erc20UsdtTokenAddress);
+        polygonComposerContract = _polygonComposerContractAddress;
     }
 
-    constructor(address _stargateBridge, address _usdtToken) {
-        stargateBridge = _stargateBridge;
-        usdtToken = _usdtToken;
-    }
-
-    function carbonOffset(
-        bytes memory proof,
-        uint256 rate,
-        address recipientAddress,
-        uint256 maxAmountReceived
-    ) public {
-        uint256 amountUSDTneeded = calculateUSDTNeeded();
-
-        require(
-            amountUSDTneeded <= maxAmountReceived,
-            "Amount exceeds max allowed"
-        );
-
-        bridgeAndSwapOnPolygon(amountUSDTneeded, recipientAddress, 1);
-    }
-
-    function calculateUSDTNeeded() internal pure returns (uint256) {
-        return 0.01 * 10 ** 6;
-    }
-
-    event DebugQuoteOFT(uint256 amountReceivedLD);
-    event DebugQuoteOFTAttemptSucceeded();
-    event DebugSendParam(SendParam sendParam);
-    event QuoteOFTFailed(string reason);
-    event QuoteOFTFailedGeneric();
-
-    /**
-     * @notice Bridges USDT from Flare to Polygon and triggers a swap on Polygon via Stargate/LayerZero composability.
-     * @param amountUSDT Amount of USDT to bridge (in 6 decimals)
-     * @param finalRecipientOnPolygon Address to receive the swapped tokens on Polygon
-     * @param minCharOutputOnPolygon Minimum amount of target token to receive on Polygon (mocked as 1 for now)
-     */
-    function bridgeAndSwapOnPolygon(
-        uint256 amountUSDT,
-        address finalRecipientOnPolygon,
-        uint256 minCharOutputOnPolygon
-    ) public payable {
-        IERC20(usdtToken).approve(STARGATE_ROUTER_FLARE, amountUSDT);
-
-        bytes memory actualComposeMsg = abi.encode(
-            msg.sender,
-            finalRecipientOnPolygon,
-            minCharOutputOnPolygon
-        );
-        bytes memory actualExtraOptions = OptionsBuilder
-            .newOptions()
-            .addExecutorLzComposeOption(0, 200000, 0);
-
-        SendParam memory debugSendParam = SendParam({
-            dstEid: POLYGON_EID,
-            to: addressToBytes32(POLYGON_COMPOSER),
-            amountLD: amountUSDT,
-            minAmountLD: amountUSDT,
-            extraOptions: bytes(""),
-            composeMsg: bytes(""),
-            oftCmd: ""
-        });
-        emit DebugSendParam(debugSendParam);
-
-        IStargate stargateRouter = IStargate(STARGATE_ROUTER_FLARE);
-
-        // Attempt to call quoteOFT and catch any revert
-        try stargateRouter.quoteOFT(debugSendParam) {
-            // If this point is reached, quoteOFT did NOT revert with debugSendParam
-            // We can't easily get the return values here without potential linter issues again,
-            // but knowing it didn't revert is the primary goal of this specific test.
-            emit DebugQuoteOFTAttemptSucceeded();
-        } catch Error(string memory reason) {
-            emit QuoteOFTFailed(reason);
-            revert(reason);
-        } catch {
-            emit QuoteOFTFailedGeneric();
-            revert(
-                "quoteOFT(debugSendParam) reverted without reason (generic catch)"
-            );
-        }
-
-        // The rest of the function remains commented out for this specific debug step.
-        // If DebugQuoteOFTAttemptSucceeded is emitted, the next step would be to try quoteOFT
-        // with the *actual* composeMsg and extraOptions, or to try and get its return values more carefully.
-        /*
-        // ... (original logic with actualSendParam, quoteSend, sendToken) ...
-        */
-    }
-
-    // Helper: address to bytes32
     function addressToBytes32(address _addr) internal pure returns (bytes32) {
         return bytes32(uint256(uint160(_addr)));
+    }
+
+    /**
+     * @notice Estimates LayerZero fee for bridgeAndExecuteOnPolygon.
+     * @param _amountUSDT Amount of USDT to bridge (6 decimals).
+     * @param _flareInitiator The address initiating this on Flare (will be part of composeMsg).
+     * @param _finalEoaRecipientOnPolygon EOA on Polygon for final benefit (part of composeMsg).
+     * @param _minOutputOrOtherParam Third parameter for composeMsg.
+     * @param _composeGasLimit Gas for lzCompose on Polygon.
+     * @return nativeFee Estimated native FLR fee.
+     * @return lzTokenFee Estimated ZRO fee (usually 0).
+     */
+    function getFeeForBridgeAndExecute(
+        uint256 _amountUSDT,
+        address _flareInitiator, 
+        address _finalEoaRecipientOnPolygon,
+        uint256 _minOutputOrOtherParam, 
+        uint256 _composeGasLimit
+    ) public view returns (uint256 nativeFee, uint256 lzTokenFee) {
+        bytes memory actualComposeMsg = abi.encode(_flareInitiator, _finalEoaRecipientOnPolygon, _minOutputOrOtherParam);
+        bytes memory actualExtraOptions = OptionsBuilder.newOptions().addExecutorLzComposeOption(0, uint128(_composeGasLimit),0);
+
+        SendParam memory initialSendParam = SendParam({
+            dstEid: POLYGON_EID,
+            to: addressToBytes32(polygonComposerContract),
+            amountLD: _amountUSDT,
+            minAmountLD: _amountUSDT, // Placeholder, refined by oftReceipt.amountReceivedLD
+            extraOptions: actualExtraOptions,
+            composeMsg: actualComposeMsg,
+            oftCmd: bytes("")
+        });
+
+        (, , OFTReceipt memory oftReceipt) = stargateUsdtOFT.quoteOFT(initialSendParam);
+
+        SendParam memory finalSendParam = SendParam({
+            dstEid: POLYGON_EID,
+            to: addressToBytes32(polygonComposerContract),
+            amountLD: _amountUSDT,
+            minAmountLD: oftReceipt.amountReceivedLD,
+            extraOptions: actualExtraOptions,
+            composeMsg: actualComposeMsg,
+            oftCmd: bytes("")
+        });
+
+        MessagingFee memory fee = stargateUsdtOFT.quoteSend(finalSendParam, false);
+        return (fee.nativeFee, fee.lzTokenFee);
+    }
+
+    /**
+     * @notice Bridges USDT, sends to Polygon composer, with compose message.
+     */
+    function bridgeAndExecuteOnPolygon(
+        uint256 _amountUSDT,
+        address _finalEoaRecipientOnPolygon, // EOA for final benefit on Polygon
+        uint256 _minOutputOrOtherParam,      // Third param for composeMsg, adjust as needed
+        uint256 _composeGasLimit           // Gas for lzCompose on Polygon contract
+    ) public payable {
+        usdtTokenOnFlare.approve(address(stargateUsdtOFT), _amountUSDT);
+
+        // Pass msg.sender as the _flareInitiator for the composeMsg
+        bytes memory actualComposeMsg = abi.encode(msg.sender, _finalEoaRecipientOnPolygon, _minOutputOrOtherParam);
+        bytes memory actualExtraOptions = OptionsBuilder.newOptions().addExecutorLzComposeOption(0, uint128(_composeGasLimit), 0);
+
+        SendParam memory initialSendParam = SendParam({
+            dstEid: POLYGON_EID,
+            to: addressToBytes32(polygonComposerContract),
+            amountLD: _amountUSDT,
+            minAmountLD: _amountUSDT,
+            extraOptions: actualExtraOptions,
+            composeMsg: actualComposeMsg,
+            oftCmd: bytes("")
+        });
+
+        (, , OFTReceipt memory oftReceiptForMinAmount) = stargateUsdtOFT.quoteOFT(initialSendParam);
+        emit QuotedOFTInfo(oftReceiptForMinAmount.amountSentLD, oftReceiptForMinAmount.amountReceivedLD);
+
+        SendParam memory finalSendParam = SendParam({
+            dstEid: POLYGON_EID,
+            to: addressToBytes32(polygonComposerContract),
+            amountLD: _amountUSDT,
+            minAmountLD: oftReceiptForMinAmount.amountReceivedLD,
+            extraOptions: actualExtraOptions,
+            composeMsg: actualComposeMsg,
+            oftCmd: bytes("")
+        });
+
+        MessagingFee memory fee = stargateUsdtOFT.quoteSend(finalSendParam, false);
+        uint256 nativeFeeToPay = fee.nativeFee;
+        uint256 lzTokenFeeToPay = fee.lzTokenFee;
+        emit QuotedSendFee(nativeFeeToPay, lzTokenFeeToPay);
+
+        require(msg.value >= nativeFeeToPay, "Insufficient FLR for LZ fee");
+
+        try stargateUsdtOFT.send{value: nativeFeeToPay}(
+            finalSendParam,
+            MessagingFee({ nativeFee: nativeFeeToPay, lzTokenFee: lzTokenFeeToPay }),
+            address(this) // refundAddress
+        ) returns (MessagingReceipt memory msgReceipt, OFTReceipt memory sendOFTReceipt) {
+            emit USDTBridgedAndComposed(
+                msgReceipt.guid,
+                sendOFTReceipt.amountSentLD,
+                sendOFTReceipt.amountReceivedLD,
+                polygonComposerContract,
+                actualComposeMsg,
+                nativeFeeToPay
+            );
+        } catch Error(string memory reason) {
+            emit BridgeAndComposeFailed(reason);
+            revert(reason);
+        } catch {
+            emit BridgeAndComposeFailed("Unknown: bridgeAndExecuteOnPolygon reverted");
+            revert("Unknown: bridgeAndExecuteOnPolygon reverted");
+        }
     }
 }
