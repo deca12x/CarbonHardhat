@@ -1,12 +1,12 @@
-# CarbonHardhat: Flare Network Smart Contracts for CarbonOffset
+# CarbonHardhat: Flare Network Smart Contracts for LayerGreen
 
-This repository contains the Solidity smart contracts deployed on the Flare Network that form the backend of the [CarbonOffset platform](https://github.com/deca12x/CarbonOffset/). These contracts are responsible for initiating the cross-chain process to acquire tokenized carbon credits on the Polygon network.
+This repository contains the Solidity smart contracts deployed on the Flare Network that form the backend of the [LayerGreen platform](https://github.com/deca12x/CarbonOffset/). These contracts are responsible for initiating the cross-chain process to acquire tokenized carbon credits on the Polygon network.
 
 **Our Vision:** To provide a secure and efficient on-chain mechanism on Flare to facilitate carbon offsetting via cross-chain interactions, powered by LayerZero.
 
 ## Overview
 
-The primary contract in this repository, `MinimalFlareUSDTBridge.sol`, enables users to bridge USDT (specifically, Stargate's USDT OFT - Omnichain Fungible Token) from the Flare Network to Polygon. This is a crucial step in the CarbonOffset user flow, where funds originating from Flare are used to purchase NCT (Nature Carbon Tonne) tokens on Polygon.
+The primary contract in this repository, `MinimalFlareUSDTBridge.sol`, enables users to bridge USDT (specifically, Stargate's USDT OFT - Omnichain Fungible Token) from the Flare Network to Polygon. This is a crucial step in the LayerGreen user flow, where funds originating from Flare are used to purchase NCT (Nature Carbon Tonne) tokens on Polygon.
 
 This system is designed to:
 1.  Receive USDT from a user (or a contract acting on their behalf) on Flare.
@@ -128,7 +128,7 @@ npx hardhat run scripts/deployAndBridge.ts --network flare
 
 This script will:
 1.  Deploy `MinimalFlareUSDTBridge.sol` to the Flare network.
-2.  Transfer the specified `amountUSDTToBridge` from the deployer's wallet to the newly deployed `MinimalFlareUSDTBridge` contract.
+2.  Transfer the specified `amountUSDTToBridge` from the deployer's wallet to the newly deployed `MinimalFlareUSdtBridge` contract.
 3.  Estimate the LayerZero native fee (FLR) required for the bridge operation.
 4.  Call `bridgeUSDTToPolygon` on the `MinimalFlareUSDTBridge` contract, sending the estimated native fee as `msg.value`.
 5.  Output transaction hashes and relevant information, including a link to LayerZeroScan to track the cross-chain message.
