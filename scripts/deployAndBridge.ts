@@ -2,7 +2,6 @@ import hre from "hardhat";
 import { parseUnits, PublicClient, WalletClient, Account, Chain, Transport, Hex, createWalletClient, http, formatUnits, erc20Abi } from "viem";
 import { privateKeyToAccount } from 'viem/accounts';
 import { flare } from 'viem/chains'; // Import flare chain definition
-import minimalBridgeArtifact from "../artifacts/contracts/MinimalFlareUSDTBridge.sol/MinimalFlareUSDTBridge.json"; // Import ABI for the new contract
 import carbonOffsetFlareArtifact from "../artifacts/contracts/CarbonOffsetFlare.sol/CarbonOffsetFlare.json";
 
 // Minimal ERC20 ABI for transfer and balanceOf
