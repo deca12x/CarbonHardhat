@@ -89,7 +89,7 @@ npx hardhat compile
 
 ## Future Enhancements
 
-- **Flare Data Connector (FDC) Integration:** Explore using FDC for on-chain carbon footprint calculations or attestations, potentially integrating this logic into `CarbonOffsetFlare.sol`.
+- **Flare Data Connector (FDC) Integration:** Explore using FDC for on-chain carbon footprint calculations and attestations, increasing the transparency of `CarbonOffsetFlare.sol`.
 - **Generalized Bridging:** Abstract the bridge contract further to support other tokens or destination chains if needed.
 - **Automated Fee Handling:** More sophisticated mechanisms for handling LayerZero fees.
 
