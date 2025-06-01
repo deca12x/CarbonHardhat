@@ -14,8 +14,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { flare } from "viem/chains"; // Import flare chain definition
-import minimalBridgeArtifact from "../artifacts/contracts/MinimalFlareUSDTBridge.sol/MinimalFlareUSDTBridge.json"; // Import ABI for the new contract
-import carbonOffsetFlareArtifact from "../artifacts/contracts/CarbonOffsetFlare.sol/CarbonOffsetFlare.json";
+import carbonOffsetFlareArtifact from "../artifacts/contracts/CarbonOffsetFlare.sol/CarbonOffset.json";
 
 // Minimal ERC20 ABI for transfer and balanceOf
 const usdtAbi = [
@@ -379,10 +378,6 @@ async function main() {
   console.log(
     "CarbonOffsetFlare contract deployed to:",
     carbonOffsetFlareContractAddress
-  );
-
-  console.log(
-    `\nTransferring ${amountUSDTToBridge.toString()} raw units of USDT from deployer to CarbonOffset contract (${carbonOffsetContractAddress})...`
   );
 
   console.log("Deployer account address:", deployerAccount.address);
