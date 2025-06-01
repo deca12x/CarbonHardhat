@@ -11,7 +11,15 @@
     "hardhat": "^2.24.1"
   },
   "dependencies": {
+    "@layerzerolabs/lz-evm-messagelib-v2": "^3.0.99",
     "@layerzerolabs/lz-evm-oapp-v2": "^3.0.99",
-    "@stargatefinance/stg-evm-v2": "^2.0.4"
-  }
+    "@layerzerolabs/lz-evm-protocol-v2": "^3.0.99",
+    "@openzeppelin/contracts": "^5.3.0",
+    "@stargatefinance/stg-evm-v2": "^2.0.4",
+    "forge": "^2.3.0",
+    "forge-std": "^1.1.2",
+    "install": "^0.13.0",
+    "viem": "^2.30.5"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
