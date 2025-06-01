@@ -1,5 +1,5 @@
 import hre from "hardhat";
-import { parseUnits, PublicClient, WalletClient, Account, Chain, Transport, Hex, createWalletClient, http, formatUnits } from "viem";
+import { parseUnits, PublicClient, WalletClient, Account, Chain, Transport, Hex, createWalletClient, http, formatUnits, erc20Abi } from "viem";
 import { privateKeyToAccount } from 'viem/accounts';
 import { flare } from 'viem/chains'; // Import flare chain definition
 import minimalBridgeArtifact from "../artifacts/contracts/MinimalFlareUSDTBridge.sol/MinimalFlareUSDTBridge.json"; // Import ABI for the new contract
@@ -411,7 +411,7 @@ async function main() {
 
     console.log("\n--- Bridge Initiated --- ");
     console.log(`   LZ Scan: https://layerzeroscan.com/tx/${bridgeTxHash} (Might take a moment to appear)`);
-    console.log("   Monitor the LayerZero message from Flare (EID 30295) to Polygon (EID 30111).");
+    console.log("   Monitor the LayerZero message from Flare (EID 30295) to Polygon (EID 30109).");
     console.log(`   Recipient ${polygonRecipientAddress} on Polygon should receive USDT.`);
 }
 

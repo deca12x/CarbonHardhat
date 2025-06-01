@@ -16,7 +16,7 @@ address constant STARGATE_ROUTER_FLARE = 0x45d417612e177672958dC0537C45a8f8d754A
 // Polygon Composer contract
 address constant POLYGON_COMPOSER = 0xCECA34B92DbBAf1715De564172c61A4782248CCD;
 // Polygon Endpoint ID
-uint32 constant POLYGON_EID = 30111;
+uint32 constant POLYGON_EID = 30109;
 
 contract CarbonOffset {
     address public stargateBridge;

@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IOFT, SendParam, MessagingFee, OFTReceipt, MessagingReceipt } from "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/interfaces/IOFT.sol";
 
 // Polygon Endpoint ID from LayerZero documentation / Stargate configuration
-uint32 constant POLYGON_EID = 30111; // Common Stargate EID for Polygon
+uint32 constant POLYGON_EID = 30109; // Common Stargate EID for Polygon
 
 contract MinimalFlareUSDTBridge {
     IOFT public immutable stargateUsdtOFT; // Renamed for clarity: this is the specific USDT OFT contract
