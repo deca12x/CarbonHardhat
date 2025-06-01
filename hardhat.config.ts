@@ -1,6 +1,8 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox-viem";
-import "dotenv/config"; // Import dotenv configuration
+import * as dotenv from "dotenv";
+
+dotenv.config();
 
 const FLARE_RPC_URL = process.env.FLARE_RPC_URL || "https://flare-api.flare.network/ext/C/rpc";
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "your_default_private_key"; // Fallback, but ensure it's set in .env
@@ -31,13 +33,21 @@ const config: HardhatUserConfig = {
     //   chainId: 137, // Polygon Mainnet
     // },
   },
-  // etherscan: { // Commented out to avoid linting issues, enable if you set up verification
-  //   // Add API keys if you want to verify contracts on Etherscan/Blockscout
-  //   // apiKey: {
-  //   //   flare: process.env.FLARESCAN_API_KEY || "",
-  //   //   polygon: process.env.POLYGONSCAN_API_KEY || "",
-  //   // },
-  // },
+  etherscan: {
+    apiKey: {
+      flare: "any", // Flare's explorer doesn't require an API key
+    },
+    customChains: [
+      {
+        network: "flare",
+        chainId: 14,
+        urls: {
+          apiURL: "https://flare-explorer.flare.network/api",
+          browserURL: "https://flare-explorer.flare.network"
+        }
+      }
+    ]
+  },
   paths: {
     sources: "./contracts",
     tests: "./test",

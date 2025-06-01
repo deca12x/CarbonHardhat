@@ -21,8 +21,8 @@ export const FLARE_USDT_ADDRESS: Hex = "0x0B38e83B86d491735fEaa0a791F65c2B995353
 export const FLARE_USDT_OFT_ADDRESS: Hex = "0x1C10CC06DC6D35970d1D53B2A23c76ef370d4135";
 export const POLYGON_COMPOSER_CONTRACT_ADDRESS: Hex = "0x7eFEED1898E127AEe75abbC29Da082ACF136ff81";
 
-// !!! CRITICAL: UPDATE THIS AFTER DEPLOYMENT !!!
-export const CARBON_OFFSET_FLARE_CONTRACT_ADDRESS: Hex = "0xYOUR_CARBON_OFFSET_FLARE_CONTRACT_ADDRESS";
+// Deployed CarbonOffsetFlare Contract
+export const CARBON_OFFSET_FLARE_CONTRACT_ADDRESS: Hex = "0xceca34b92dbbaf1715de564172c61a4782248ccd";
 
 // 📋 PRE-DEPLOYMENT CHECKLIST:
 // ✅ 1. Verify FLARE_USDT_ADDRESS is correct for mainnet
@@ -35,7 +35,7 @@ export const CARBON_OFFSET_FLARE_CONTRACT_ADDRESS: Hex = "0xYOUR_CARBON_OFFSET_F
 // --- Carbon Offset Configuration ---
 export const CHAR_ACTUAL_RATE = 5; // 5 USDT per tonne CO2
 export const USDT_DECIMALS = 6;
-export const CHAR_RATE_SCALED = BigInt(CHAR_ACTUAL_RATE * (10 ** USDT_DECIMALS));
+export const CHAR_RATE_SCALED = 2000000n; // Adjust this based on your actual CHAR-USDT rate
 
 // --- FDC Configuration ---
 export const FDC_FEE_CFLR = "0.1"; // Placeholder fee in CFLR
