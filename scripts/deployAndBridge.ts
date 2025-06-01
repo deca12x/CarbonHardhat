@@ -363,6 +363,8 @@ async function main() {
   console.log(
     `\nTransferring ${amountUSDTToBridge.toString()} raw units of USDT from deployer to CarbonOffset contract (${carbonOffsetContractAddress})...`
   );
+
+  console.log("Deployer account address:", deployerAccount.address);
   const deployerUsdtBalanceBefore = (await publicClient.readContract({
     address: flareUsdtAddress,
     abi: usdtAbi,
